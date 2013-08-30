@@ -29,7 +29,6 @@ class PreCommitJob:
             return 0
 
         nextBuild = self.Info()['nextBuildNumber']
-        print str(nextBuild) + "\n"
         self.jenkins.build_job(self.jobId, {'SHELVE':self.p4ShelfNum, 'REVIEWBOARD_ID':self.reviewBoardId, 'token':'opwv'})
         return nextBuild
        
