@@ -39,6 +39,7 @@ class PreCommitJob:
 parser = OptionParser()
 parser.add_option("-r", "--review",
                   dest="reviewBoardId",
+                  default="0",
                   help="")
 parser.add_option("-c", "--change",
                   dest="p4ChangeNum",
@@ -53,7 +54,24 @@ parser.add_option("-j", "--job",
                   dest="job",
                   help="")
 
+def usage():
+    print "Invalid options:\n"
+    print "PreCommitJob.py -c <changeNum> -u <user> -p <password> -j <job> [-r <reviewId>]\n"
+    sys.exit(0)
+
 (options, args) = parser.parse_args(sys.argv[1:])
+
+if options.p4ChangeNum is None:
+    usage()
+
+if options.user is None:
+    usage()
+
+if options.password is None:
+    usage()
+
+if options.job is None:
+    usage()
 
 precommitJob = PreCommitJob('http://jenkins.bfs.openwave.com:8080/jenkins',
                             options.user,
