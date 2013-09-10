@@ -5,7 +5,7 @@ import sys
 
 def usage():
     print "Invalid options:\n"
-    print "CompareBuilds.py -c <changeNum> -j <job> -1 <buildId1> [-2 <buildId2>]\n"
+    print "CompareBuilds.py -j <job> -1 <buildId1> [-2 <buildId2>]\n"
     print "If -2 build is omitted then -1 is compared to the last instrumented build for this pre-commit job"
     sys.exit(0)
 
