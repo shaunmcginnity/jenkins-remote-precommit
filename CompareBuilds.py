@@ -5,7 +5,8 @@ import sys
 
 def usage():
     print "Invalid options:\n"
-    print "JobStatus.py -c <changeNum> -j <job> -1 <buildId1> -2 <buildId2>\n"
+    print "JobStatus.py -c <changeNum> -j <job> -1 <buildId1> [-2 <buildId2>]\n"
+    print "If -2 build is omitted then -1 is compared to the last instrumented build for this pre-commit job"
     sys.exit(0)
 
 def main():
@@ -21,6 +22,9 @@ def main():
                       help="")
 
     (options, args) = parser.parse_args(sys.argv[1:])
+
+    if not options.job:
+        usage()
 
     print 'Using job %s' % (options.job)
 
