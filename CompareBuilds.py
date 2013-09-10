@@ -3,104 +3,129 @@ from BuildPackageSummary import JenkinsJob, BuildPackageSummary
 from optparse import OptionParser
 import sys
 
-parser = OptionParser()
-parser.add_option("-u", "--user",
-                  dest="user",
-                  help="")
-parser.add_option("-p", "--password",
-                  dest="password",
-                  help="")
-parser.add_option("-j",
-                  dest="job",
-                  help="")
-parser.add_option("-1",
-                  dest="buildId1",
-                  help="")
-parser.add_option("-2",
-                  dest="buildId2",
-                  help="")
-
-(options, args) = parser.parse_args(sys.argv[1:])
-
 def usage():
     print "Invalid options:\n"
-    print "JobStatus.py -c <changeNum> -u <user> -p <password> -j <job> [-r <reviewId>]\n"
+    print "JobStatus.py -c <changeNum> -j <job> -1 <buildId1> -2 <buildId2>\n"
     sys.exit(0)
 
-print "Using -> " + options.job
+def main():
+    parser = OptionParser()
+    parser.add_option("-j",
+                      dest="job",
+                      help="")
+    parser.add_option("-1",
+                      dest="buildId1",
+                      help="")
+    parser.add_option("-2",
+                      dest="buildId2",
+                      help="")
 
-job = JenkinsJob('http://jenkins.bfs.openwave.com:8080/jenkins',
-                 options.user,
-                 options.password,
-                 options.job) 
+    (options, args) = parser.parse_args(sys.argv[1:])
 
-url1 = job.Info()['url'] + str(options.buildId1)
+    print 'Using job %s' % (options.job)
 
-if options.buildId2:
-    url2 = job.Info()['url'] + str(options.buildId2)
-else:
-    instrumentedJobLabel = 'Instrumented_' + options.job.replace('Pre-Commit_', '')
-    print "Instrumented : " + instrumentedJobLabel
-    instrumentedJob = JenkinsJob('http://jenkins.bfs.openwave.com:8080/jenkins',
-                                 options.user,
-                                 options.password,
-                                 instrumentedJobLabel)
-    print instrumentedJob.Info()
-    url2 = instrumentedJob.Info()['lastSuccessfulBuild']['url']
-    tmpUrl = url1
-    url1 = url2
-    url2 = tmpUrl
+    job = JenkinsJob('http://jenkins.bfs.openwave.com:8080/jenkins',
+                     options.job) 
 
-buildSummary1 = BuildPackageSummary(url1)
-buildSummary2 = BuildPackageSummary(url2)
+    url1 = job.Info()['url'] + str(options.buildId1)
 
+    if options.buildId2:
+        url2 = job.Info()['url'] + str(options.buildId2)
+    else:
+        instrumentedJobLabel = 'Instrumented_' + options.job.replace('Pre-Commit_', '')
+        print "Instrumented : " + instrumentedJobLabel
+        instrumentedJob = JenkinsJob('http://jenkins.bfs.openwave.com:8080/jenkins',
+                                     instrumentedJobLabel)
+        url2 = instrumentedJob.Info()['lastSuccessfulBuild']['url']
+        tmpUrl = url1
+        url1 = url2
+        url2 = tmpUrl
 
-[removed, changed, added] = buildSummary1.compareTo(buildSummary2)
+    buildSummary1 = BuildPackageSummary(url1)
+    buildSummary2 = BuildPackageSummary(url2)
 
-print removed
-print "\n\n"
-print changed
-print "\n\n"
-print added
+    [removed, changed, added] = buildSummary1.compareTo(buildSummary2)
+
+    reports = []
+    for [old, new] in changed:
+        for metric in ['files', 'methods', 'lines', 'classes', 'conditionals']:
+            [hit, total, ratio, delta] = compare(old, new, metric)
+            if hit != '-' or total != '-':
+                reports.append(report(new['package'], metric, hit, total, ratio, delta))
+
+    if reports:
+        print 'Changed\n%s\n%s' % (reportHeader(), ''.join(reports))
+
+    reports = []
+    for new in added:
+        for metric in ['files', 'methods', 'lines', 'classes', 'conditionals']:
+            [hit, total, ratio, delta] = compare([], new, metric)
+            if hit != '-' or total != '-':
+                reports.append(report(new['package'], metric, hit, total, ratio, delta))
+
+    if reports:
+        print 'Added\n%s\n%s' % (reportHeader(), ''.join(reports))
+    #print ''.join(reports)
+
+def diff(old, new):
+    if old == new:
+        return ['- %d:%d' % (new, new), 0]
+
+    if old < new:
+        return ['^ %d:%d' % (old, new), new - old]
+
+    return ['v %d:%d' % (old, new), old - new]
+
+def compareDiffs(hitDiff, totalDiff):
+    if hitDiff > totalDiff:
+        return '^ %d' % (hitDiff - totalDiff)
+    else:
+        if hitDiff == totalDiff:
+            return '- %d' % (totalDiff - hitDiff)
+        else:
+            return 'v %d' % (totalDiff - hitDiff)
+
+def ratio(hit, total) :
+    if total == 0:
+       return 0.0 
+    return float(hit) / float(total)
 
 def compare(old, new, idx):
-    if old[idx] == new[idx]:
-        return ['-', '-']
+    oldMetric = '0/0'
 
-    oldVal = old[idx].split('/')
+    if idx in old:
+        if old[idx] == new[idx]:
+            return ['-', '-', '-', '-']
+        else:
+            oldMetric = old[idx]
+
+    oldVal = oldMetric.split('/')
     newVal = new[idx].split('/')
+    oldHit = int(oldVal[0])
+    newHit = int(newVal[0])
+    oldTotal = int(oldVal[1])
+    newTotal = int(newVal[1])
+
     hit = '-'
     total = '-'
-    if newVal[0] == '0':
-        hit = '!' + " " + oldVal[0] + "/" + newVal[0]
-        total = '!' + " " + oldVal[1] + "/" + newVal[1]
-        return [hit, total]
+    hitDiff = 0
+    totalDiff = 0
+    if newHit == 0:
+        hit = '! %s:%s'  % (oldVal[0], newVal[0])
+        [total, totalDiff] = diff(oldTotal, newTotal)
+        return [hit, total, 0.0, 100*(ratio(newHit, newTotal) - ratio(oldHit,oldTotal))] #compareDiffs(0, totalDiff)]
 
-    if not oldVal[0] == newVal[0]:
-        old = int(oldVal[0])
-        new = int(newVal[0])
-        if old < new:
-            hit = '^ %d/%d %d' % (old, new, (new - old))
-        else:
-            hit = 'v %d/%d %d' % (old, new, (old - new))
-    if not oldVal[1] == newVal[1]:
-        old = int(oldVal[1])
-        new = int(newVal[1])
-        if old < new:
-            total = '^ %d/%d %d' % (old, new, (new - old))
-        else:
-            total = 'v %d/%d %d' % (old, new, (old - new))
+    [hit, hitDiff] = diff(oldHit, newHit)
+    [total, totalDiff] = diff(oldTotal, newTotal)
 
-    return [hit, total]
+    return [hit, total, 100*(ratio(newHit,newTotal)), 100*(ratio(newHit,newTotal) - ratio(oldHit,oldTotal))] #compareDiffs(hitDiff, totalDiff)]
 
-def report(package, metric, hit, total):
-    print "%50s : %15s : hits %20s     total %20s" % (package, metric, hit, total)
+def reportHeader():
+    return '%50s   %15s   %20s     %20s    %7s    %s\n\n' % ('Package', 'Metric', 'Hits', 'Total', '% ', 'Delta')
 
-for [old, new] in changed:
-    for metric in ['files', 'methods', 'lines', 'classes', 'conditionals']:
-        [hit, total] = compare(old, new, metric)
-        if hit != '-' or total != '-':
-            report(old['package'], metric, hit, total)
+def report(package, metric, hit, total, ratio, delta):
+    return '%50s   %15s   %20s     %20s    %7.2f  %7.2f\n' % (package, metric, hit, total, ratio, delta)
+
 
 #                   total
 #                   same          up            down
@@ -108,3 +133,5 @@ for [old, new] in changed:
 #           up      GREEN         UNKNOWN       GREEN
 #           down    RED           RED           UNKNOWN
 
+if __name__ == "__main__":
+    main()
