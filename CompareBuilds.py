@@ -20,6 +20,14 @@ def main():
     parser.add_option("-2",
                       dest="buildId2",
                       help="")
+    parser.add_option("-l",
+                      action="store_true",
+                      dest="lines",
+                      help="")
+    parser.add_option("-c",
+                      action="store_true",
+                      dest="conditionals",
+                      help="")
 
     (options, args) = parser.parse_args(sys.argv[1:])
 
@@ -30,6 +38,17 @@ def main():
 
     job = JenkinsJob('http://jenkins.bfs.openwave.com:8080/jenkins',
                      options.job) 
+
+    metrics = []
+    if options.lines:
+        metrics.append('lines')
+    if options.conditionals:
+        metrics.append('conditionals')
+
+    if 0 == len(metrics):
+        metrics = ['files', 'methods', 'lines', 'classes', 'conditionals']
+
+    print 'Using metrics %s' % (metrics)
 
     url1 = job.Info()['url'] + str(options.buildId1)
 
@@ -51,18 +70,27 @@ def main():
     [removed, changed, added] = buildSummary1.compareTo(buildSummary2)
 
     reports = []
+    sums = dict()
+    counts = dict()
+    for metric in metrics:
+        counts[metric] = 0
+        sums[metric] = 0
+    
     for [old, new] in changed:
-        for metric in ['files', 'methods', 'lines', 'classes', 'conditionals']:
+        for metric in metrics:
             [hit, total, ratio, delta] = compare(old, new, metric)
             if hit != '-' or total != '-':
+                counts[metric] += 1
+                sums[metric] += delta
                 reports.append(report(new['package'], metric, hit, total, ratio, delta))
 
     if reports:
         print 'Changed\n%s\n%s' % (reportHeader(), ''.join(reports))
+        print '\n%s %s\n' % (counts, sums)
 
     reports = []
     for new in added:
-        for metric in ['files', 'methods', 'lines', 'classes', 'conditionals']:
+        for metric in metrics:
             [hit, total, ratio, delta] = compare([], new, metric)
             if hit != '-' or total != '-':
                 reports.append(report(new['package'], metric, hit, total, ratio, delta))
