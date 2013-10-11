@@ -28,6 +28,11 @@ def main():
                       action="store_true",
                       dest="conditionals",
                       help="")
+    parser.add_option("-s",
+                      action="store_true",
+                      default=False,
+                      dest="short",
+                      help="")
 
     (options, args) = parser.parse_args(sys.argv[1:])
 
@@ -70,33 +75,45 @@ def main():
     [removed, changed, added] = buildSummary1.compareTo(buildSummary2)
 
     reports = []
-    sums = dict()
-    counts = dict()
+    changes = []
+    summedHitDiff = dict()
+    summedTotalDiff = dict()
     for metric in metrics:
-        counts[metric] = 0
-        sums[metric] = 0
-    
+        summedHitDiff[metric] = 0
+        summedTotalDiff[metric] = 0
+   
     for [old, new] in changed:
         for metric in metrics:
-            [hit, total, ratio, delta] = compare(old, new, metric)
+            [hit, total, ratio, delta, hitdiff, totaldiff] = compare(old, new, metric)
             if hit != '-' or total != '-':
-                counts[metric] += 1
-                sums[metric] += delta
                 reports.append(report(new['package'], metric, hit, total, ratio, delta))
+                summedHitDiff[metric] += hitdiff
+                summedTotalDiff[metric] += totaldiff
 
     if reports:
-        print 'Changed\n%s\n%s' % (reportHeader(), ''.join(reports))
-        print '\n%s %s\n' % (counts, sums)
+        if options.short is False:
+            print 'Changed\n%s\n%s' % (reportHeader(), ''.join(reports))
+        for metric in metrics:
+            changes.append(reportMetricChange(metric, summedTotalDiff[metric], summedHitDiff[metric]))
+        print 'Changes\n%s\n%s' % (reportMetricChangeHeader(), ''.join(changes))
 
     reports = []
+    changes = []
     for new in added:
         for metric in metrics:
-            [hit, total, ratio, delta] = compare([], new, metric)
+            [hit, total, ratio, delta, hitdiff, totaldiff] = compare([], new, metric)
             if hit != '-' or total != '-':
                 reports.append(report(new['package'], metric, hit, total, ratio, delta))
+                summedHitDiff[metric] += hitdiff
+                summedTotalDiff[metric] += totaldiff
 
     if reports:
-        print 'Added\n%s\n%s' % (reportHeader(), ''.join(reports))
+        if options.short is False:
+            print 'Added\n%s\n%s' % (reportHeader(), ''.join(reports))
+        for metric in metrics:
+            changes.append(reportMetricChange(metric, summedTotalDiff[metric], summedHitDiff[metric]))
+        print 'Changes\n%s\n%s' % (reportMetricChangeHeader(), ''.join(changes))
+
     #print ''.join(reports)
 
 def diff(old, new):
@@ -106,7 +123,7 @@ def diff(old, new):
     if old < new:
         return ['^ %d:%d' % (old, new), new - old]
 
-    return ['v %d:%d' % (old, new), old - new]
+    return ['v %d:%d' % (old, new), new - old]
 
 def compareDiffs(hitDiff, totalDiff):
     if hitDiff > totalDiff:
@@ -127,7 +144,7 @@ def compare(old, new, idx):
 
     if idx in old:
         if old[idx] == new[idx]:
-            return ['-', '-', '-', '-']
+            return ['-', '-', '-', '-', 0, 0]
         else:
             oldMetric = old[idx]
 
@@ -145,18 +162,24 @@ def compare(old, new, idx):
     if newHit == 0:
         hit = '! %s:%s'  % (oldVal[0], newVal[0])
         [total, totalDiff] = diff(oldTotal, newTotal)
-        return [hit, total, 0.0, 100*(ratio(newHit, newTotal) - ratio(oldHit,oldTotal))] #compareDiffs(0, totalDiff)]
+        return [hit, total, 0.0, 100*(ratio(newHit, newTotal) - ratio(oldHit,oldTotal)), 0, totalDiff] #compareDiffs(0, totalDiff)]
 
     [hit, hitDiff] = diff(oldHit, newHit)
     [total, totalDiff] = diff(oldTotal, newTotal)
 
-    return [hit, total, 100*(ratio(newHit,newTotal)), 100*(ratio(newHit,newTotal) - ratio(oldHit,oldTotal))] #compareDiffs(hitDiff, totalDiff)]
+    return [hit, total, 100*(ratio(newHit,newTotal)), 100*(ratio(newHit,newTotal) - ratio(oldHit,oldTotal)), hitDiff, totalDiff] #compareDiffs(hitDiff, totalDiff)]
 
 def reportHeader():
     return '%50s   %15s   %20s     %20s    %7s    %s\n\n' % ('Package', 'Metric', 'Hits', 'Total', '% ', 'Delta')
 
 def report(package, metric, hit, total, ratio, delta):
     return '%50s   %15s   %20s     %20s    %7.2f  %7.2f\n' % (package, metric, hit, total, ratio, delta)
+
+def reportMetricChangeHeader():
+    return '%15s  %6s  %6s    %6s\n%15s  %6s  %6s    %6s\n' % ('Metric', 'Total', 'Hits', 'Gap', '', 'Change', 'Change', 'Change')
+
+def reportMetricChange(metric, totalDiff, hitDiff):
+    return '%15s  %6d  %6d    %6d\n' % (metric, totalDiff, hitDiff, totalDiff - hitDiff)
 
 
 #                   total
