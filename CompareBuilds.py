@@ -16,23 +16,23 @@ def main():
                       help="")
     parser.add_option("-1",
                       dest="buildId1",
-                      help="")
+                      help="build id")
     parser.add_option("-2",
                       dest="buildId2",
-                      help="")
+                      help="build id to compare with (will use instrumented if not set)")
     parser.add_option("-l",
                       action="store_true",
                       dest="lines",
-                      help="")
+                      help="Report lines coverage")
     parser.add_option("-c",
                       action="store_true",
                       dest="conditionals",
-                      help="")
+                      help="Report conditionals coverage")
     parser.add_option("-s",
                       action="store_true",
                       default=False,
                       dest="short",
-                      help="")
+                      help="Provide a summary")
 
     (options, args) = parser.parse_args(sys.argv[1:])
 
@@ -96,6 +96,8 @@ def main():
         for metric in metrics:
             changes.append(reportMetricChange(metric, summedTotalDiff[metric], summedHitDiff[metric]))
         print 'Changes\n%s\n%s' % (reportMetricChangeHeader(), ''.join(changes))
+    else:
+        print 'No changes!!'
 
     reports = []
     changes = []
@@ -113,6 +115,8 @@ def main():
         for metric in metrics:
             changes.append(reportMetricChange(metric, summedTotalDiff[metric], summedHitDiff[metric]))
         print 'Changes\n%s\n%s' % (reportMetricChangeHeader(), ''.join(changes))
+    else:
+        print 'No changes!!'
 
     #print ''.join(reports)
 
@@ -140,6 +144,9 @@ def ratio(hit, total) :
     return float(hit) / float(total)
 
 def compare(old, new, idx):
+
+    print "compare " + idx
+
     oldMetric = '0/0'
 
     if idx in old:
