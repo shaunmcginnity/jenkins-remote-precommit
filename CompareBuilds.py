@@ -97,7 +97,7 @@ def main():
             changes.append(reportMetricChange(metric, summedTotalDiff[metric], summedHitDiff[metric]))
         print 'Changes\n%s\n%s' % (reportMetricChangeHeader(), ''.join(changes))
     else:
-        print 'No changes!!'
+        print 'No packages changed!!'
 
     reports = []
     changes = []
@@ -116,7 +116,7 @@ def main():
             changes.append(reportMetricChange(metric, summedTotalDiff[metric], summedHitDiff[metric]))
         print 'Changes\n%s\n%s' % (reportMetricChangeHeader(), ''.join(changes))
     else:
-        print 'No changes!!'
+        print 'No packages added!!'
 
     #print ''.join(reports)
 
@@ -144,8 +144,6 @@ def ratio(hit, total) :
     return float(hit) / float(total)
 
 def compare(old, new, idx):
-
-    print "compare " + idx
 
     oldMetric = '0/0'
 

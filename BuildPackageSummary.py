@@ -19,6 +19,7 @@ class BuildPackageSummary:
         statsTable = soup.find('table', attrs={'class':'pane sortable'})
         metrics = []
         self.packages = dict()
+
         for row in statsTable.findChildren('tr', recursive=False):
             #print "Found row " + str(row)
             ths = row.find_all('th', recursive=False)
@@ -29,12 +30,15 @@ class BuildPackageSummary:
             tds = row.find_all('td', recursive=False)
             if tds:
                 package = tds[0].a.text
+                #print "Got package " + package
                 metricIndex = 0
                 packageMetrics = {}
                 packageMetrics['package'] = package
                 for metric in metrics:
-                    value = self.getStatFromPackageTable(tds[metricIndex + 1], "0/1")
+                    #print "Getting metric " + metric + " in " + package
+                    value = self.getStatFromPackageTable(tds[metricIndex], "0/1")
                     packageMetrics[metric] = value
+                    metricIndex+=1
 
                 self.packages[package] = packageMetrics
 
@@ -43,9 +47,14 @@ class BuildPackageSummary:
         return statTable[1].text if len(statTable) > 1 else default
 
     def dump(self):
+        print "======="
+        print "Dumping"
+        print "======="
         for package in self.packages:
-            files = self.packages[package]['files'].split('/')
-            print package + " " + self.packages[package]['files'] + " " + str(float(100 * int(files[0]) / int(files[1])))
+            #files = self.packages[package]['files'].split('/')
+            for metric in self.packages[package]:
+                print package + " " + metric + " " + self.packages[package][metric]
+        print "======="
 
     def compareTo(self, other):
         removed = []
@@ -54,11 +63,17 @@ class BuildPackageSummary:
         for package in self.packages:
             thisPackage = self.packages[package]
             if package in other.packages:
+                packageChanged = False
                 otherPackage = other.packages[package]
                 for metric in thisPackage:
                     if metric in otherPackage:
                         if thisPackage[metric] != otherPackage[metric]:
-                            changed.append([thisPackage, otherPackage])
+                            packageChanged = True
+
+                if packageChanged is True:
+                    #print "Adding " + metric + " for " + package + " -> " + thisPackage[metric] + " " + otherPackage[metric]
+                    changed.append([thisPackage, otherPackage])
+
             else:
                 removed.append(thisPackage)
 
